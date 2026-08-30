@@ -8,7 +8,7 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
     const status = toStatusCode(err);
 
     logger.warn({
-      msg: err.message,
+      message: err.message,
       code: err.code,
       status,
       requestId: req.id,
@@ -28,7 +28,7 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   }
 
   logger.error({
-    msg: err instanceof Error ? err.message : 'Unknown error',
+    message: err instanceof Error ? err.message : 'Unknown error',
     stack: err instanceof Error ? err.stack : undefined,
     requestId: req.id,
     path: req.originalUrl,
