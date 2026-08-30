@@ -24,3 +24,7 @@ export class ForbiddenError extends AppError {
 export class ValidationError extends AppError {
   readonly code = 'VALIDATION_FAILED';
 }
+
+export class UnauthorizedError extends AppError {
+  readonly code = 'UNAUTHORIZED';
+}
