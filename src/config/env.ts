@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 
-dotenv.config();
+dotenv.config({ quiet: true });
 const NODE_ENVS = ['development', 'production', 'test'] as const;
 type NodeEnv = (typeof NODE_ENVS)[number];
 
