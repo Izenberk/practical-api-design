@@ -19,8 +19,13 @@
     "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@swc/core": "^1.16.1",
+    "@swc/jest": "^0.2.39",
     "@types/express": "^5.0.6",
     "@types/node": "^26.4.0",
+    "@types/supertest": "^7.2.1",
+    "jest": "^30.5.0",
+    "supertest": "^7.2.2",
     "tsx": "^4.23.12",
     "typescript": "^7.0.2"
   }
