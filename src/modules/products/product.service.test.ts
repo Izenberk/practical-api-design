@@ -96,6 +96,17 @@ describe('ProductService', () => {
       expect(updated.createdAt).toEqual(created.createdAt);
     });
 
+    it('clears the description when null is sent', async () => {
+      const created = await service.create({
+        ...validInput,
+        description: 'clicky',
+      });
+
+      const updated = await service.update(created.id, { description: null });
+
+      expect(updated.description).toBeNull();
+    });
+
     it('throws NotFoundError for an unknown id', async () => {
       await expect(
         service.update('missing-id', { priceSatang: 1 }),

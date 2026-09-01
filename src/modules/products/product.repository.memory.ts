@@ -50,7 +50,7 @@ export class InMemoryProductRepository implements ProductRepository {
     const updated: Product = {
       ...existing,
       ...(input.name !== undefined && {name: input.name }),
-      ...(input.description != undefined && {
+      ...(input.description !== undefined && {
         description: input.description,
       }),
       ...(input.priceSatang !== undefined && { priceSatang: input.priceSatang }),

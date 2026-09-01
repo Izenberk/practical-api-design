@@ -12,7 +12,7 @@ export interface Product {
 
 export interface CreateProductInput {
   readonly name: string;
-  readonly description?: string;
+  readonly description?: string | null;
   readonly priceSatang: number;
   readonly currency?: string;
   readonly stock?: number;
