@@ -58,7 +58,7 @@ const optionalSeconds = (key: string, fallback: number): number => {
 
   const parsed = Number(raw);
   if (!Number.isInteger(parsed) || parsed < 1) {
-    problems.push(`${key} must be a positive integer, recieved "${raw}"`);
+    problems.push(`${key} must be a positive integer, received "${raw}"`);
     return fallback;
   }
   return parsed;
