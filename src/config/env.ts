@@ -9,6 +9,7 @@ export interface EnvConfig {
   readonly NODE_ENV: NodeEnv;
   readonly JWT_SECRET: string;
   readonly LOG_LEVEL: string;
+  readonly JWT_EXPIRES_SECONDS: number;
 }
 
 const problems: string[] = [];
@@ -51,11 +52,24 @@ NodeEnv => {
   return raw;
 };
 
+const optionalSeconds = (key: string, fallback: number): number => {
+  const raw = process.env[key];
+  if (raw === undefined || raw.trim() === '') return fallback;
+
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    problems.push(`${key} must be a positive integer, recieved "${raw}"`);
+    return fallback;
+  }
+  return parsed;
+};
+
 const parsed: EnvConfig = {
   PORT: optionalPort('PORT', 3000),
   NODE_ENV: optionalNodeEnv('NODE_ENV', 'development'),
   JWT_SECRET: requireString('JWT_SECRET'),
   LOG_LEVEL: process.env.LOG_LEVEL ?? 'info',
+  JWT_EXPIRES_SECONDS: optionalSeconds('JWT_EXPIRES_SECONDS', 900),
 };
 
 if (problems.length > 0) {
