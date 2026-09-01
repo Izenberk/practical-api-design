@@ -7,7 +7,7 @@
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest"
+    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest"
   },
   "keywords": [],
   "author": "",
@@ -25,6 +25,7 @@
     "@types/express": "^5.0.6",
     "@types/node": "^26.4.0",
     "@types/supertest": "^7.2.1",
+    "cross-env": "^10.1.0",
     "jest": "^30.5.0",
     "supertest": "^7.2.2",
     "tsx": "^4.23.12",
