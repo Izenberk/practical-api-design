@@ -28,3 +28,7 @@ export class ValidationError extends AppError {
 export class UnauthorizedError extends AppError {
   readonly code = 'UNAUTHORIZED';
 }
+
+export class TooManyRequestsError extends AppError {
+  readonly code = 'TOO_MANY_REQUESTS';
+}
