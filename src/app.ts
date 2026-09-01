@@ -12,6 +12,8 @@ app.use((req, _res, next) => {
   next();
 });
 
+app.use(express.json());
+
 app.get('/', (_req, res) => {
   res.send('Welcome to typescript backend');
 })
