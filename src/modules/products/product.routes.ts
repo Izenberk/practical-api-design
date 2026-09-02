@@ -9,10 +9,11 @@ import {
   productIdSchema,
   listProductsSchema,
 } from "./product.schema.js"
+import { container } from "../../core/container.js";
 
-const repository = new InMemoryProductRepository();
-const service = new ProductService(repository);
+const service = new ProductService(container.products);
 const controller = new ProductController(service);
+
 
 export const productRouter = Router();
 
