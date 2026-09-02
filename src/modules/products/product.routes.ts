@@ -1,7 +1,6 @@
 import { Router } from "express";
 import { ProductController } from "./product.controller.js";
 import { ProductService } from "./product.service.js";
-import { InMemoryProductRepository } from "./product.repository.memory.js";
 import { validate } from "../../middleware/validate.js";
 import {
   createProductSchema,
@@ -10,6 +9,8 @@ import {
   listProductsSchema,
 } from "./product.schema.js"
 import { container } from "../../core/container.js";
+import { authenticate } from "../../middleware/authenticate.js";
+import { authorize } from "../../middleware/authorize.js";
 
 const service = new ProductService(container.products);
 const controller = new ProductController(service);
@@ -25,6 +26,8 @@ productRouter.get(
 
 productRouter.post(
   '/',
+  authenticate,
+  authorize('admin'),
   validate(createProductSchema),
   controller.create,
 );
@@ -37,6 +40,8 @@ productRouter.get(
 
 productRouter.put(
   '/:id',
+  authenticate,
+  authorize('admin'),
   validate(productIdSchema, 'params'),
   validate(updateProductSchema),
   controller.update,
@@ -44,6 +49,8 @@ productRouter.put(
 
 productRouter.delete(
   '/:id',
+  authenticate,
+  authorize('admin'),
   validate(productIdSchema, 'params'),
   controller.remove,
 );
