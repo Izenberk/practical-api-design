@@ -10,6 +10,8 @@ export interface EnvConfig {
   readonly JWT_SECRET: string;
   readonly LOG_LEVEL: string;
   readonly JWT_EXPIRES_SECONDS: number;
+  readonly ADMIN_EMAIL: string | null;
+  readonly ADMIN_PASSWORD: string | null;
 }
 
 const problems: string[] = [];
@@ -64,12 +66,20 @@ const optionalSeconds = (key: string, fallback: number): number => {
   return parsed;
 };
 
+const optionalString = (key: string): string | null => {
+  const raw = process.env[key];
+  if (raw === undefined || raw.trim() === '') return null;
+  return raw;
+};
+
 const parsed: EnvConfig = {
   PORT: optionalPort('PORT', 3000),
   NODE_ENV: optionalNodeEnv('NODE_ENV', 'development'),
   JWT_SECRET: requireString('JWT_SECRET'),
   LOG_LEVEL: process.env.LOG_LEVEL ?? 'info',
   JWT_EXPIRES_SECONDS: optionalSeconds('JWT_EXPIRES_SECONDS', 900),
+  ADMIN_EMAIL: optionalString('ADMIN_EMAIL'),
+  ADMIN_PASSWORD: optionalString('ADMIN_PASSWORD'),
 };
 
 if (problems.length > 0) {
