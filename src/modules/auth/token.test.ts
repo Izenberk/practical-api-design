@@ -20,5 +20,35 @@ describe('token', () => {
     expect(decoded.role).toBe('admin');
   });
 
-  it('rejects a token signed with a different secret', () => {})
-})
+  it('rejects a token signed with a different secret', () => {
+    const forged = jwt.sign(payload, 'not-the-real-secret', {
+      algorithm: 'HS256',
+      expiresIn: 900,
+    });
+
+    expect(() => verifyAccessToken(forged)).toThrow(UnauthorizedError);
+  });
+
+  it('rejects an expired token', () => {
+    const expired = jwt.sign(payload, env.JWT_SECRET, {
+      algorithm: 'HS256',
+      expiresIn: -10,
+    });
+
+    expect(() => verifyAccessToken(expired)).toThrow(UnauthorizedError);
+  });
+
+  it('rejects a validly signed token with no role claim', () => {
+    const roleless = jwt.sign(
+      { sub: payload.sub, email: payload.email },
+      env.JWT_SECRET,
+      { algorithm: 'HS256', expiresIn: 900 },
+    );
+
+    expect(() => verifyAccessToken(roleless)).toThrow(UnauthorizedError);
+  });
+
+  it('rejects a malformed token', () => {
+    expect(() => verifyAccessToken('not.a.token')).toThrow(UnauthorizedError);
+  });
+});
