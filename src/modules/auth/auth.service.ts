@@ -6,6 +6,7 @@ import {
   ConflictError,
   UnauthorizedError,
 } from "../../core/errors/app-error.js";
+import { normalizeEmail } from "../users/email.js";
 
 export interface AuthResult {
   readonly user: User;
@@ -16,7 +17,8 @@ export class AuthService {
   constructor(private readonly users: UserRepository) {}
 
   async register(email: string, password: string): Promise<AuthResult> {
-    const existing = await this.users.findByEmail(email);;
+    const normalizedEmail = normalizeEmail(email)
+    const existing = await this.users.findByEmail(normalizeEmail(email));;
 
     if (existing !== null) {
       throw new ConflictError('Email already registered');
@@ -24,7 +26,7 @@ export class AuthService {
 
     const passwordHash = await hashPassword(password);
     const user = await this.users.create({
-      email,
+      email: normalizedEmail,
       passwordHash,
       role: 'user',
     });
@@ -33,7 +35,7 @@ export class AuthService {
   }
 
   async login(email: string, password: string): Promise<AuthResult> {
-    const found = await this.users.findByEmail(email);
+    const found = await this.users.findByEmail(normalizeEmail(email));
 
     if (found === null) {
       throw new UnauthorizedError('Invalid email or password');
