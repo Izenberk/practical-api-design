@@ -1,3 +1,5 @@
+export const USER_ROLES = ['admin', 'user'] as const;
+
 export type UserRole = 'admin' | 'user';
 
 export interface User {
@@ -15,5 +17,15 @@ export interface UserWithSecret extends User {
 export interface CreateUserInput {
   readonly email: string;
   readonly passwordHash: string;
+  readonly role: UserRole;
+}
+
+export interface UpdateUserInput {
+  readonly email?: string;
+  readonly role?: UserRole;
+}
+
+export interface Requester {
+  readonly id: string;
   readonly role: UserRole;
 }
