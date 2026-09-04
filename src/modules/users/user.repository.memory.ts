@@ -1,6 +1,16 @@
 import { randomUUID } from "node:crypto";
-import type { UserRepository } from "./user.repository.js";
-import type { User, UserWithSecret, CreateUserInput } from './user.types.js';
+import type { ListUsersOptions, UserRepository } from "./user.repository.js";
+import type {
+  User,
+  UserWithSecret,
+  CreateUserInput,
+  UpdateUserInput,
+} from './user.types.js';
+
+const withoutSecret = (stored: UserWithSecret): User => {
+  const { passwordHash: _passwordHash, ...user } = stored;
+  return user;
+};
 
 export class InMemoryUserRepository implements UserRepository {
   private readonly items = new Map<string, UserWithSecret>();
@@ -17,7 +27,15 @@ export class InMemoryUserRepository implements UserRepository {
     if (found === undefined) return null;
 
     const { passwordHash: _passwordHash, ...user } = found
-    return user
+    return withoutSecret(found);
+  }
+
+  async findAll(options: ListUsersOptions): Promise<User[]> {
+    const all = [...this.items.values()]
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .map(withoutSecret);
+
+    return all.slice(options.offset, options.offset + options.limit);
   }
 
   async create(input: CreateUserInput): Promise<User> {
@@ -34,8 +52,26 @@ export class InMemoryUserRepository implements UserRepository {
 
     this.items.set(stored.id, stored);
 
-    const { passwordHash: _passwordHash, ...user } = stored;
-    return user;
+    return withoutSecret(stored);
+  }
+
+  async update(id: string, input: UpdateUserInput): Promise<User | null> {
+    const existing = this.items.get(id);
+    if (existing === undefined) return null;
+
+    const updated: UserWithSecret = {
+      ...existing,
+      ...(input.email !== undefined && { email: input.email }),
+      ...(input.role !== undefined && { role: input.role }),
+      updatedAt: new Date(),
+    };
+
+    this.items.set(id, updated);
+    return withoutSecret(updated);
+  };
+
+  async delete(id: string): Promise<boolean> {
+    return this.items.delete(id);
   }
 
   clear(): void {
