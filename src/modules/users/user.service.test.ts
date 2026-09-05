@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "@jest/globals";
+import { describe, it, expect, beforeEach, beforeAll } from "@jest/globals";
 import { UserService } from "./user.service.js";
 import { InMemoryUserRepository } from "./user.repository.memory.js";
 import { hashPassword } from "./password.js";
@@ -9,13 +9,19 @@ import {
 } from "../../core/errors/app-error.js";
 import type { User, Requester, UserRole } from "./user.types.js";
 
+let passwordHash: string;
+
+beforeAll(async () => {
+  passwordHash = await hashPassword('hunter2hunter2');
+})
+
 const seed = async (
   users: InMemoryUserRepository,
   email: string,
   role: UserRole
 ): Promise<User> => users.create({
   email,
-  passwordHash: await hashPassword('hunter2hunter2'),
+  passwordHash,
   role,
 });
 
