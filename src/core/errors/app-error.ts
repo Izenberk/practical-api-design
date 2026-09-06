@@ -32,3 +32,7 @@ export class UnauthorizedError extends AppError {
 export class TooManyRequestsError extends AppError {
   readonly code = 'TOO_MANY_REQUESTS';
 }
+
+export class BadRequestError extends AppError {
+  readonly code = 'BAD_REQUEST';
+}
