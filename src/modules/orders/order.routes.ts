@@ -11,6 +11,7 @@ import {
   listOrderSchema,
   updateOrderStatusSchema,
 } from "./order.schema.js";
+import { idempotency } from "../../middleware/idempotency.js";
 
 const service = new OrderService(container.orders, container.products);
 const controller = new OrderController(service);
@@ -21,6 +22,7 @@ orderRouter.post(
   '/',
   authenticate,
   validate(createOrderSchema),
+  idempotency(container.idempotency),
   controller.create,
 );
 
