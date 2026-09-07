@@ -29,6 +29,8 @@ export const idempotency =
   const key = `${requester.id}:${req.method}:${req.baseUrl}${req.path}:${provided.trim()}`;
   const requestHash = hashBody(req.body);
 
+  res.locals.idempotencyKey = key;
+
   const existing = await store.claim(key, requestHash);
 
   if (existing !== null) {

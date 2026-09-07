@@ -1,6 +1,6 @@
 import type { RequestHandler } from "express";
 import type { PaymentService } from "./payment.service.js";
-import type { ListPaymentOptions } from "./payment.repository.js";
+import type { PageOptions } from "./payment.repository.js";
 import { requesterOf } from "../../middleware/authenticate.js";
 
 interface CreatePaymentBody {
@@ -12,22 +12,25 @@ export class PaymentController {
 
   pay: RequestHandler = async (req, res) => {
     const { orderId } = req.body as CreatePaymentBody;
-    const payment = await this.service.pay(orderId, requesterOf(req));
+    const idempotencyKey = res.locals.idempotencyKey as string;
+
+    const payment = await this.service.pay(
+      orderId,
+      requesterOf(req),
+      idempotencyKey,
+  );
 
     res
       .status(201)
-      .location(`/api/v1/payment/${payment.id}`)
+      .location(`/api/v1/payments/${payment.id}`)
       .json({ data: payment })
   };
 
   list: RequestHandler = async (req, res) => {
-    const requester = requesterOf(req);
-    const page = res.locals.query as ListPaymentOptions;
+    const page = res.locals.query as PageOptions;
+    const payments = await this.service.list(page, requesterOf(req));
 
-    const options: ListPaymentOptions = 
-      requester.role === 'admin' ? page : { ...page, userId: requester.id };
-
-    res.json({ data: await this.service.list(options) });
+    res.json({ data: payments });
   };
 
   getById: RequestHandler = async (req, res) => {

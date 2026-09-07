@@ -11,13 +11,26 @@ import type {
  * mocking.
  */
 export class FakePaymentGateway implements PaymentGateway {
-  async charge(request: ChargeRequest): Promise<ChargeResult> {
-    const providerRef = `fake_${randomUUID()}`;
+  private readonly seen = new Map<string, ChargeResult>();
 
-    if (request.amountSatang % 100 === 13) {
-      return { outcome: 'failed', providerRef, reason: 'Card declined' };
+  async charge(request: ChargeRequest): Promise<ChargeResult> {
+    const replayed = this.seen.get(request.idempotencyKey);
+
+    if (replayed !== undefined) {
+      return replayed;
     }
 
-    return { outcome: 'succeeded', providerRef };
+    const providerRef = `fake_${randomUUID()}`;
+    const result: ChargeResult =
+      request.amountSatang % 100 === 13
+        ? { outcome: 'failed', providerRef, reason: 'Card declined'}
+        : { outcome: 'succeeded', providerRef };
+
+    this.seen.set(request.idempotencyKey, result);
+    return result;
+  }
+
+  clear(): void {
+    this.seen.clear();
   }
 }

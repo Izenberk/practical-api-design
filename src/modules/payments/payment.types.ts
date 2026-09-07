@@ -8,6 +8,7 @@ export interface Payment {
   readonly amountSatang: number;
   readonly currency: string;
   readonly status: PaymentStatus;
+  readonly failureReason: string | null;
   readonly providerRef: string;
   readonly createdAt: Date;
 }
@@ -18,5 +19,6 @@ export interface CreatePaymentInput {
   readonly amountSatang: number;
   readonly currency: string;
   readonly status: PaymentStatus;
+  readonly failureReason: string | null;
   readonly providerRef: string;
 }

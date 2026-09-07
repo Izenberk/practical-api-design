@@ -30,6 +30,7 @@ export class InMemoryPaymentRepository implements PaymentRepository {
       amountSatang: input.amountSatang,
       currency: input.currency,
       status: input.status,
+      failureReason: input.failureReason,
       providerRef: input.providerRef,
       createdAt: new Date(),
     };

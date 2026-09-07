@@ -2,6 +2,7 @@ export interface ChargeRequest {
   readonly amountSatang: number;
   readonly currency: string;
   readonly reference: string;
+  readonly idempotencyKey: string;
 }
 
 export interface ChargeSucceeded {

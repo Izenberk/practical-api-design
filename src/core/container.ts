@@ -39,4 +39,6 @@ export const resetContainer = (): void => {
   instances.products.clear();
   instances.orders.clear();
   instances.idempotency.clear();
+  instances.payments.clear();
+  instances.gateway.clear();
 };
