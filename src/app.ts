@@ -8,10 +8,21 @@ import { rateLimiter } from './middleware/rate-limit.js';
 import { NotFoundError } from './core/errors/app-error.js';
 import { healthRouter } from './routes/health.js';
 import { v1Router } from './routes/v1.js';
+import { docsRouter } from './routes/docs.js';
 
 export const app = express();
 
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+        'script-src': ["'self'", "'unsafe-inline'"],
+        'style-src': ["'self'", "'unsafe-inline'", 'https:'],
+        'img-src': ["'self'", 'data:', 'https:'],
+      },
+    },
+  }));
 app.use(cors());
 
 app.use((req, _res, next) => {
@@ -28,6 +39,7 @@ app.get('/', (_req, res) => {
 })
 
 app.use('/health', healthRouter);
+app.use('/docs', docsRouter);
 app.use('/api/v1', v1Router);
 
 app.use((req, _res, next) => {

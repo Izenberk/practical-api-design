@@ -1,0 +1,597 @@
+openapi: 3.1.0
+info:
+  title: Practical API Design — E-commerce API
+  version: 1.0.0
+  description: |
+    Small e-commerce REST API built for the BorntoDev "Practical API Design"
+    final project. Covers products, users, orders and payments with JWT
+    authentication, role-based access control and idempotent writes.
+
+servers:
+  - url: /api/v1
+
+tags:
+  - name: Auth
+  - name: Products
+  - name: Users
+  - name: Orders
+  - name: Payments
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    offset:
+      name: offset
+      in: query
+      schema: { type: integer, minimum: 0, default: 0 }
+    id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    idempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: |
+        Client-generated key. Repeating a request with the same key replays the
+        original response instead of performing the operation again.
+      schema: { type: string, minLength: 1, maxLength: 255 }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              enum:
+                - VALIDATION_FAILED
+                - UNAUTHORIZED
+                - FORBIDDEN
+                - NOT_FOUND
+                - CONFLICT
+                - BAD_REQUEST
+                - TOO_MANY_REQUESTS
+                - INTERNAL_ERROR
+            message: { type: string }
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field: { type: string }
+                  message: { type: string }
+            requestId: { type: string, format: uuid }
+
+    Product:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        priceSatang:
+          type: integer
+          description: Price in satang. 28900 means ฿289.00.
+        currency: { type: string, example: THB }
+        stock: { type: integer }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateProduct:
+      type: object
+      required: [name, priceSatang]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        description: { type: string, nullable: true, maxLength: 2000 }
+        priceSatang: { type: integer, minimum: 0 }
+        currency: { type: string, minLength: 3, maxLength: 3, default: THB }
+        stock: { type: integer, minimum: 0, default: 0 }
+
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        role: { type: string, enum: [admin, user] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    Credentials:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8, maxLength: 72 }
+
+    AuthResult:
+      type: object
+      properties:
+        user: { $ref: '#/components/schemas/User' }
+        accessToken: { type: string }
+
+    OrderItem:
+      type: object
+      properties:
+        productId: { type: string, format: uuid }
+        name:
+          type: string
+          description: Product name captured when the order was placed.
+        unitPriceSatang:
+          type: integer
+          description: Unit price captured when the order was placed.
+        quantity: { type: integer }
+
+    Order:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [pending, paid, shipped, delivered, cancelled]
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/OrderItem' }
+        totalSatang: { type: integer }
+        currency: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateOrder:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [productId, quantity]
+            properties:
+              productId: { type: string, format: uuid }
+              quantity: { type: integer, minimum: 1 }
+
+    Payment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        orderId: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        amountSatang: { type: integer }
+        currency: { type: string }
+        status: { type: string, enum: [succeeded, failed] }
+        providerRef: { type: string }
+        createdAt: { type: string, format: date-time }
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid token
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Authenticated but not allowed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Resource not found, or hidden from this requester
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: Conflicts with current state
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ValidationFailed:
+      description: Request body or parameters failed validation
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register and receive a token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Credentials' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/AuthResult' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Exchange credentials for a token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Credentials' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/AuthResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /products:
+    get:
+      tags: [Products]
+      summary: List active products
+      parameters:
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/offset'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Product' }
+    post:
+      tags: [Products]
+      summary: Create a product
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateProduct' }
+      responses:
+        '201':
+          description: Created
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Product' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+
+  /products/{id}:
+    parameters:
+      - $ref: '#/components/parameters/id'
+    get:
+      tags: [Products]
+      summary: Get one product
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Product' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Products]
+      summary: Update a product
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateProduct' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Product' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Products]
+      summary: Delete a product
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: Deleted }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /users:
+    get:
+      tags: [Users]
+      summary: List users (admin only)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/offset'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/User' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /users/{id}:
+    parameters:
+      - $ref: '#/components/parameters/id'
+    get:
+      tags: [Users]
+      summary: Get one user
+      description: |
+        A non-admin may only read their own record. Any other id returns 404,
+        including ids that do not exist, so the endpoint cannot be used to
+        discover which accounts are registered.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/User' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [Users]
+      summary: Update a user
+      description: Only an admin may change `role`.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string, format: email }
+                role: { type: string, enum: [admin, user] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/User' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [Users]
+      summary: Delete a user
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: Deleted }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /orders:
+    get:
+      tags: [Orders]
+      summary: List orders
+      description: A non-admin sees only their own orders.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/offset'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Order' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Orders]
+      summary: Place an order
+      description: |
+        Item names and unit prices are captured at order time, so the order is
+        unaffected by later changes to the product catalogue.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/idempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateOrder' }
+      responses:
+        '201':
+          description: Created
+          headers:
+            Idempotent-Replay:
+              description: Present and `true` when this is a replayed response.
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Order' }
+        '409':
+          description: Same key reused with a different body, or already in flight
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+
+  /orders/{id}:
+    parameters:
+      - $ref: '#/components/parameters/id'
+    get:
+      tags: [Orders]
+      summary: Get one order
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Order' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Orders]
+      summary: Delete an order (admin only)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: Deleted }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /orders/{id}/status:
+    parameters:
+      - $ref: '#/components/parameters/id'
+    put:
+      tags: [Orders]
+      summary: Change order status
+      description: |
+        Allowed transitions: pending→paid (admin), pending→cancelled (admin or
+        owner), paid→shipped (admin), shipped→delivered (admin). Anything else
+        returns 409. Note that pending→paid here is the manual admin path;
+        paying through `/payments` performs the same transition automatically.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [paid, shipped, delivered, cancelled]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Order' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /payments:
+    get:
+      tags: [Payments]
+      summary: List payments
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/offset'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Payment' }
+    post:
+      tags: [Payments]
+      summary: Pay for an order
+      description: |
+        Charges the order total through the payment gateway and moves the order
+        to `paid` on success. A declined charge is still recorded, and the order
+        stays `pending`.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/idempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderId]
+              properties:
+                orderId: { type: string, format: uuid }
+      responses:
+        '201':
+          description: Payment succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Payment' }
+        '400':
+          description: Charge declined
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /payments/{id}:
+    parameters:
+      - $ref: '#/components/parameters/id'
+    get:
+      tags: [Payments]
+      summary: Get one payment
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Payment' }
+        '404': { $ref: '#/components/responses/NotFound' }
