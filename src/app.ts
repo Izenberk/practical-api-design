@@ -12,17 +12,7 @@ import { docsRouter } from './routes/docs.js';
 
 export const app = express();
 
-app.use(
-  helmet({
-    contentSecurityPolicy: {
-      directives: {
-        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-        'script-src': ["'self'", "'unsafe-inline'"],
-        'style-src': ["'self'", "'unsafe-inline'", 'https:'],
-        'img-src': ["'self'", 'data:', 'https:'],
-      },
-    },
-  }));
+app.use(helmet());
 app.use(cors());
 
 app.use((req, _res, next) => {
