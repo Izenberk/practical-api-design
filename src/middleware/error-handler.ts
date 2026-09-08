@@ -3,7 +3,12 @@ import { AppError } from "../core/errors/app-error.js";
 import { toStatusCode } from "../core/errors/http-mapper.js";
 import { logger } from "../core/logger.js";
 
-export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
+export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
+  if (res.headersSent) {
+    next(err);
+    return;
+  }
+  
   if (err instanceof AppError) {
     const status = toStatusCode(err);
 
