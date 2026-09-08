@@ -354,6 +354,26 @@ paths:
                     items: { $ref: '#/components/schemas/User' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Get the authenticated user
+      description: |
+        Resolves the caller from the bearer token, so no id is passed and no
+        ownership check can fail. Declared before /users/{id} because Express
+        matches routes in order and `me` would otherwise be read as an id.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
   /users/{id}:
     parameters:
       - $ref: '#/components/parameters/id'
