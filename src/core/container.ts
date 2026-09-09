@@ -4,12 +4,14 @@ import { InMemoryOrderRepository } from "../modules/orders/order.repository.memo
 import { InMemoryIdempotencyStore } from "./idempotency/idempotency.store.memory.js";
 import { InMemoryPaymentRepository } from "../modules/payments/payment.repository.memory.js";
 import { FakePaymentGateway } from "../modules/payments/adapters/fake.gateway.js";
+import { InMemoryCache } from "./cache/memory.cache.js";
 import type { UserRepository } from "../modules/users/user.repository.js";
 import type { ProductRepository } from "../modules/products/product.repository.js";
 import type { OrderRepository } from "../modules/orders/order.repository.js";
 import type { IdempotencyStore } from "./idempotency/idempotency.store.js";
 import type { PaymentRepository } from "../modules/payments/payment.repository.js";
 import type { PaymentGateway } from "../modules/payments/payment.gateway.js";
+import type { CacheStore } from "./cache/cache.port.js";
 
 export interface Container {
   readonly users: UserRepository;
@@ -18,6 +20,7 @@ export interface Container {
   readonly idempotency: IdempotencyStore;
   readonly payments: PaymentRepository;
   readonly gateway: PaymentGateway;
+  readonly cache: CacheStore;
 }
 
 // Concrete instances, kept private. The exported `container` narrows these to
@@ -29,6 +32,7 @@ const instances = {
   idempotency: new InMemoryIdempotencyStore(),
   payments: new InMemoryPaymentRepository(),
   gateway: new FakePaymentGateway(),
+  cache: new InMemoryCache(),
 };
 
 export const container: Container = instances;
@@ -41,4 +45,5 @@ export const resetContainer = (): void => {
   instances.idempotency.clear();
   instances.payments.clear();
   instances.gateway.clear();
+  instances.cache.clear();
 };

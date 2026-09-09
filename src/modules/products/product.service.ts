@@ -9,12 +9,32 @@ import type {
   UpdateProductInput,
 } from './product.types.js';
 import { NotFoundError } from '../../core/errors/app-error.js';
+import type { CacheStore } from '../../core/cache/cache.port.js';
+
+const LIST_PREFIX = 'products:list';
+
+const listKey = (options: ListProductsOptions): string =>
+  `${LIST_PREFIX}limit=${options.limit}:offset=${options.offset}` +
+  `:inactive=${options.includeInactive === true}`;
 
 export class ProductService {
-  constructor(private readonly repository: ProductRepository) {}
+  constructor(
+    private readonly repository: ProductRepository,
+    private readonly cache: CacheStore,
+  ) {}
 
   async list(options: ListProductsOptions): Promise<Product[]> {
-    return this.repository.findAll(options);
+    const key = listKey(options);
+    const cached = await this.cache.get<Product[]>(key);
+
+    if (cached !== null) {
+      return cached;
+    }
+
+    const products = await this.repository.findAll(options);
+    await this.cache.set(key, products);
+
+    return products;
   }
 
   async getById(id: string): Promise<Product> {
@@ -28,7 +48,10 @@ export class ProductService {
   }
 
   async create(input: CreateProductInput): Promise<Product> {
-    return this.repository.create(input);
+    const product = await this.repository.create(input);
+    await this.cache.invalidatePrefix(LIST_PREFIX);
+
+    return product;
   }
 
   async update(id: string, input: UpdateProductInput): Promise<Product> {
@@ -37,6 +60,8 @@ export class ProductService {
     if (updated === null) {
       throw new NotFoundError(`Product ${id} not found`);
     }
+
+    await this.cache.invalidatePrefix(LIST_PREFIX);
 
     return updated;
   }
@@ -47,5 +72,7 @@ export class ProductService {
     if (!deleted) {
       throw new NotFoundError(`Product ${id} not found`);
     }
+
+    await this.cache.invalidatePrefix(LIST_PREFIX);
   }
 }

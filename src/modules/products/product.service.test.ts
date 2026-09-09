@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { ProductService } from './product.service.js';
 import { InMemoryProductRepository } from './product.repository.memory.js';
+import { InMemoryCache } from '../../core/cache/memory.cache.js';
 import { NotFoundError } from '../../core/errors/app-error.js';
 import type { CreateProductInput } from './product.types.js';
 
@@ -11,11 +12,13 @@ const validInput: CreateProductInput = {
 
 describe('ProductService', () => {
   let repository: InMemoryProductRepository;
+  let cache: InMemoryCache;
   let service: ProductService;
 
   beforeEach(() => {
     repository = new InMemoryProductRepository();
-    service = new ProductService(repository);
+    cache = new InMemoryCache();
+    service = new ProductService(repository, cache);
   });
 
   describe('create', () => {
@@ -125,6 +128,87 @@ describe('ProductService', () => {
 
     it('throws NotFoundError for an unknown id', async () => {
       await expect(service.remove('missing-id')).rejects.toThrow(NotFoundError);
+    });
+  });
+
+  describe('caching', () => {
+    it('serve a repeated list from the cache', async () => {
+      await service.create(validInput);
+      const findAll = jest.spyOn(repository, 'findAll');
+
+      await service.list({ limit: 10, offset: 0 });
+      await service.list({ limit: 10, offset: 0 });
+
+      expect(findAll).toHaveBeenCalledTimes(1);
+    });
+
+    it('treats a different page as a different key', async () => {
+      const findAll = jest.spyOn(repository, 'findAll');
+
+      await service.list({ limit: 10, offset: 0 });
+      await service.list({ limit: 10, offset: 10});
+
+      expect(findAll).toHaveBeenCalledTimes(2)
+    });
+
+    it('treats includeInactive as part of the key', async () => {
+      const findAll = jest.spyOn(repository, 'findAll');
+
+      await service.list({ limit: 10, offset: 0 });
+      await service.list({ limit: 10, offset: 0, includeInactive: true });
+
+      expect(findAll).toHaveBeenCalledTimes(2);
+    });
+
+    it('treats an omitted includeInactive and false as one key', async () => {
+      const findAll = jest.spyOn(repository, 'findAll');
+
+      await service.list({ limit: 10, offset: 0 });
+      await service.list({ limit: 10, offset: 0, includeInactive: false });
+
+      expect(findAll).toHaveBeenCalledTimes(1);
+    });
+
+    it('evicts the list cache when a product is created', async () => {
+      await service.list({ limit: 10, offset: 0 });
+
+      await service.create(validInput);
+      const products = await service.list({ limit: 10, offset: 0 });
+
+      expect(products).toHaveLength(1);
+    });
+
+    it('evicts the list cache when a product is updated', async () => {
+      const created = await service.create(validInput);
+      await service.list({ limit: 10, offset: 0 });
+
+      await service.update(created.id, { priceSatang: 199000 });
+      const products = await service.list({ limit: 10, offset: 0 });
+
+      expect(products[0]?.priceSatang).toBe(199000);
+    });
+
+    it('evicts the list cache when a product is removed', async () => {
+      const created = await service.create(validInput);
+      await service.list({ limit: 10, offset: 0 });
+
+      await service.remove(created.id);
+      const products = await service.list({ limit: 10, offset: 0 });
+
+      expect(products).toHaveLength(0);
+    });
+
+    it('does not evict when a write fails', async () => {
+      await service.create(validInput);
+      await service.list({ limit: 10, offset: 0 });
+      const findAll = jest.spyOn(repository, 'findAll');
+
+      await expect(
+        service.update('missing-id', { priceSatang: 1 }),
+      ).rejects.toThrow(NotFoundError);
+      await service.list({ limit: 10, offset: 0 });
+
+      expect(findAll).not.toHaveBeenCalled();
     });
   });
 });

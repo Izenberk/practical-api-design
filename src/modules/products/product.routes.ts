@@ -12,7 +12,7 @@ import { container } from "../../core/container.js";
 import { authenticate } from "../../middleware/authenticate.js";
 import { authorize } from "../../middleware/authorize.js";
 
-const service = new ProductService(container.products);
+const service = new ProductService(container.products, container.cache);
 const controller = new ProductController(service);
 
 
