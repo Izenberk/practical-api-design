@@ -30,7 +30,7 @@ Requires **Node 22+**.
 | Command | Does |
 |---|---|
 | `npm run dev` | Watch mode via `tsx` |
-| `npm test` | Jest — 15 suites, 130+ tests |
+| `npm test` | Jest — 16 suites, 150 tests |
 | `npm run typecheck` | `tsc --noEmit`; the test transform does **not** type-check |
 | `npm run build` | Compile to `dist/` and copy the OpenAPI spec |
 | `npm start` | Run the compiled output |
@@ -190,13 +190,21 @@ already been committed — and a retry would charge twice. Cost: clients read
 `data.status` rather than the status line.
 
 **Cache invalidation is by prefix, on write.** A write cannot know which page a
-product moved to, so any product write drops the whole cached page set. The 60
-second TTL is a backstop, not the strategy.
+record moved to, so a product write drops the whole cached product page set and
+an order write drops the whole cached order page set. The 60 second TTL is a
+backstop, not the strategy.
 
-**Orders are deliberately not cached.** Their lists are filtered by requester, so
-a shared key would serve one user's orders to another — a data leak that looks
-like a cache hit. Correct caching needs the requester id in the key, which buys
-little at this size.
+**Order cache keys carry the requester.** Order lists are filtered per user, so a
+key built from pagination alone would serve one user's orders to whoever asks for
+page 1 next — a data leak that looks like a cache hit. The key includes the
+requester id, or a single `admin` scope since every admin sees the same rows.
+Product lists need no such scoping: the catalogue is identical for everyone.
+
+**Paying evicts the order cache explicitly.** `PaymentService` writes the paid
+status through the repository rather than `OrderService`, because the state table
+allows `pending → paid` to an admin only while the payer is usually the owner.
+That bypass means nothing else drops the order list, so `PaymentService` holds a
+`CacheStore` and evicts the prefix itself once a charge settles.
 
 ---
 
@@ -206,7 +214,7 @@ little at this size.
 npm test
 ```
 
-15 suites, 130+ tests, under six seconds. No database, no network, no mocks of
+16 suites, 150 tests, under six seconds. No database, no network, no mocks of
 things that matter.
 
 - **Unit tests** colocate with their subject (`*.service.test.ts`)
