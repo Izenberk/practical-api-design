@@ -18,11 +18,25 @@ import {
   NotFoundError,
   ValidationError,
 } from "../../core/errors/app-error.js"
+import type { CacheStore } from "../../core/cache/cache.port.js";
+
+export const ORDER_LIST_PREFIX = 'orders:list:';
+
+/**
+ * The requester is part of the key, not just the filter. An orders page is a
+ * different result set for every user, so a key built from pagination alone
+ * would serve one user's orders to the next caller that asks for page 1.
+ * Admins all see everything, so they share one 'admin' scope.
+ */
+const listKey = (page: PageOptions, requester: Requester): string =>
+  `${ORDER_LIST_PREFIX}scope=${requester.role === 'admin' ? 'admin' : requester.id}` +
+  `:limit=${page.limit}:offset=${page.offset}`;
 
 export class OrderService {
   constructor(
     private readonly orders: OrderRepository,
     private readonly products: ProductRepository,
+    private readonly cache: CacheStore,
   ) {}
 
   async create(
@@ -67,21 +81,35 @@ export class OrderService {
       throw new ValidationError('An order must contain at least one item');
     }
 
-    return this.orders.create({
+    const order = await this.orders.create({
       userId: requester.id,
       items,
       totalSatang,
       currency,
     });
+
+    await this.cache.invalidatePrefix(ORDER_LIST_PREFIX);
+
+    return order;
   }
 
   async list(page: PageOptions, requester: Requester): Promise<Order[]> {
+    const key = listKey(page, requester);
+    const cached = await this.cache.get<Order[]>(key);
+
+    if (cached !== null) {
+      return cached;
+    }
+
     const options: ListOrderOptions = {
-    ...page,
-    ...(requester.role !== 'admin' && { userId: requester.id }),
+      ...page,
+      ...(requester.role !== 'admin' && { userId: requester.id }),
     };
 
-    return this.orders.findAll(options);
+    const orders = await this.orders.findAll(options);
+    await this.cache.set(key, orders);
+
+    return orders;
   }
 
   async getById(id: string, requester: Requester): Promise<Order> {
@@ -125,6 +153,8 @@ export class OrderService {
       throw new NotFoundError(`Order ${id} not found`);
     }
 
+    await this.cache.invalidatePrefix(ORDER_LIST_PREFIX);
+
     return updated;
   }
 
@@ -138,6 +168,8 @@ export class OrderService {
     if (!deleted) {
       throw new NotFoundError(`Order ${id} not found`);
     }
+
+    await this.cache.invalidatePrefix(ORDER_LIST_PREFIX);
   }
 
   private assertVisibleTo(order: Order, requester: Requester): void {

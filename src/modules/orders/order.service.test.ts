@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach } from "@jest/globals";
+import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 import { randomUUID } from "node:crypto";
 import { OrderService } from "./order.service.js";
 import { InMemoryOrderRepository } from "./order.repository.memory.js";
 import { InMemoryProductRepository } from "../products/product.repository.memory.js";
+import { InMemoryCache } from "../../core/cache/memory.cache.js";
 import {
   ConflictError,
   ForbiddenError,
@@ -21,13 +22,15 @@ const admin: Requester = { id: randomUUID(), role: 'admin' };
 describe('OrderService', () => {
   let orders: InMemoryOrderRepository;
   let products: InMemoryProductRepository;
+  let cache: InMemoryCache;
   let service: OrderService;
   let keyboard: Product;
 
   beforeEach(async () => {
     orders = new InMemoryOrderRepository();
     products = new InMemoryProductRepository();
-    service = new OrderService(orders, products);
+    cache = new InMemoryCache();
+    service = new OrderService(orders, products, cache);
 
     keyboard = await products.create({
       name: 'Mechanical Keyboard',
@@ -255,6 +258,74 @@ describe('OrderService', () => {
       await expect(service.remove(randomUUID(), admin)).rejects.toThrow(
         NotFoundError,
       );
+    });
+  });
+
+  describe('caching', () => {
+    it('serves a repeated list from the cache', async () => {
+      await service.create([{ productId: keyboard.id, quantity: 1 }], alice);
+      const findAll = jest.spyOn(orders, 'findAll');
+
+      await service.list({ limit: 10, offset: 0 }, alice);
+      await service.list({ limit: 10, offset: 0 }, alice);
+
+      expect(findAll).toHaveBeenCalledTimes(1);
+    });
+
+    it('never serves one user the cached page of another', async () => {
+      await service.create([{ productId: keyboard.id, quantity: 1 }], alice);
+
+      const mine = await service.list({ limit: 10, offset: 0 }, alice);
+      const theirs = await service.list({ limit: 10, offset: 0 }, bob);
+
+      expect(mine).toHaveLength(1);
+      expect(theirs).toHaveLength(0);
+    });
+
+    it('gives an admin a different cache entry from a user', async () => {
+      await service.create([{ productId: keyboard.id, quantity: 1 }], alice);
+
+      const asAlice = await service.list({ limit: 10, offset: 0 }, alice);
+      const asAdmin = await service.list({ limit: 10, offset: 0 }, admin);
+
+      expect(asAlice).toHaveLength(1);
+      expect(asAdmin).toHaveLength(1);
+      expect(asAdmin[0]?.userId).toBe(alice.id);
+    });
+
+    it('evicts the list cache when an order is created', async () => {
+      await service.list({ limit: 10, offset: 0 }, alice);
+
+      await service.create([{ productId: keyboard.id, quantity: 1 }], alice);
+      const listed = await service.list({ limit: 10, offset: 0 }, alice);
+
+      expect(listed).toHaveLength(1);
+    });
+
+    it('evicts the list cache when a status changes', async () => {
+      const order = await service.create(
+        [{ productId: keyboard.id, quantity: 1 }],
+        alice,
+      );
+      await service.list({ limit: 10, offset: 0 }, alice);
+
+      await service.updateStatus(order.id, 'paid', admin);
+      const listed = await service.list({ limit: 10, offset: 0 }, alice);
+
+      expect(listed[0]?.status).toBe('paid');
+    });
+
+    it('evicts the list cache when an order is deleted', async () => {
+      const order = await service.create(
+        [{ productId: keyboard.id, quantity: 1 }],
+        alice,
+      );
+      await service.list({ limit: 10, offset: 0 }, alice);
+
+      await service.remove(order.id, admin);
+      const listed = await service.list({ limit: 10, offset: 0 }, alice);
+
+      expect(listed).toHaveLength(0);
     });
   });
 });

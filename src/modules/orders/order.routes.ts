@@ -13,7 +13,7 @@ import {
 } from "./order.schema.js";
 import { idempotency } from "../../middleware/idempotency.js";
 
-const service = new OrderService(container.orders, container.products);
+const service = new OrderService(container.orders, container.products, container.cache);
 const controller = new OrderController(service);
 
 export const orderRouter = Router();
