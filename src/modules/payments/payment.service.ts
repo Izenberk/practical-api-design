@@ -1,6 +1,8 @@
 import type { PaymentRepository, ListPaymentOptions, PageOptions } from "./payment.repository.js";
 import type { OrderRepository } from "../orders/order.repository.js";
 import type { PaymentGateway } from "./payment.gateway.js";
+import type { CacheStore } from "../../core/cache/cache.port.js";
+import { ORDER_LIST_PREFIX } from "../orders/order.service.js";
 import type { Payment } from "./payment.types.js";
 import type { Requester } from "../users/user.types.js";
 import {
@@ -13,6 +15,7 @@ export class PaymentService {
     private readonly payment: PaymentRepository,
     private readonly orders: OrderRepository,
     private readonly gateway: PaymentGateway,
+    private readonly cache: CacheStore,
   ) {}
 
   async pay(orderId: string, requester: Requester, idempotencyKey: string): Promise<Payment> {
@@ -51,6 +54,11 @@ export class PaymentService {
       // System-triggered transition. The state table governs manual admin
       // changes; a settled charge has already earned pending -> paid.
       await this.orders.updateStatus(order.id, 'paid');
+
+      // The repository was written behind OrderService's back, so nothing has
+      // evicted the orders list cache. Without this, a caller who listed their
+      // orders in the last TTL window still sees this one as pending.
+      await this.cache.invalidatePrefix(ORDER_LIST_PREFIX);
     }
 
     return payment;

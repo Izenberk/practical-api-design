@@ -3,6 +3,9 @@ import { randomUUID } from "node:crypto";
 import { PaymentService } from "./payment.service.js";
 import { InMemoryPaymentRepository } from "./payment.repository.memory.js";
 import { InMemoryOrderRepository } from "../orders/order.repository.memory.js";
+import { OrderService } from "../orders/order.service.js";
+import { InMemoryProductRepository } from "../products/product.repository.memory.js";
+import { InMemoryCache } from "../../core/cache/memory.cache.js";
 import {
   ConflictError,
   NotFoundError,
@@ -35,6 +38,7 @@ describe('PaymentService', () => {
   let payments: InMemoryPaymentRepository;
   let orders: InMemoryOrderRepository;
   let gateway: StubGateway;
+  let cache: InMemoryCache;
   let service: PaymentService;
 
   const makeOrder = (userId: string): Promise<Order> =>
@@ -56,7 +60,8 @@ describe('PaymentService', () => {
     payments = new InMemoryPaymentRepository();
     orders = new InMemoryOrderRepository();
     gateway = new StubGateway();
-    service = new PaymentService(payments, orders, gateway);
+    cache = new InMemoryCache();
+    service = new PaymentService(payments, orders, gateway, cache);
   });
 
   describe('pay', () => {
@@ -214,6 +219,47 @@ describe('PaymentService', () => {
 
       expect(page).toHaveLength(2);
       expect(next).toHaveLength(1);
+    });
+  });
+
+  describe('orders cache', () => {
+    /**
+     * pay() writes the order status through the repository, bypassing
+     * OrderService, so nothing else evicts the orders list cache. Both services
+     * share one cache and one repository here, exactly as the container wires
+     * them, which is the only way this regression is observable.
+     */
+    it('evicts a cached orders page after a successful payment', async () => {
+      const orderService = new OrderService(
+        orders,
+        new InMemoryProductRepository(),
+        cache,
+      );
+      const order = await makeOrder(alice.id);
+
+      const before = await orderService.list({ limit: 10, offset: 0 }, alice);
+      expect(before[0]?.status).toBe('pending');
+
+      await service.pay(order.id, alice, 'key-1');
+
+      const after = await orderService.list({ limit: 10, offset: 0 }, alice);
+      expect(after[0]?.status).toBe('paid');
+    });
+
+    it('leaves the cache alone when the charge is declined', async () => {
+      gateway.outcome = 'failed';
+      const orderService = new OrderService(
+        orders,
+        new InMemoryProductRepository(),
+        cache,
+      );
+      const order = await makeOrder(alice.id);
+
+      await orderService.list({ limit: 10, offset: 0 }, alice);
+      await service.pay(order.id, alice, 'key-1');
+
+      const after = await orderService.list({ limit: 10, offset: 0 }, alice);
+      expect(after[0]?.status).toBe('pending');
     });
   });
 });

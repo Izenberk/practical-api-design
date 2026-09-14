@@ -15,6 +15,7 @@ const service = new PaymentService(
   container.payments,
   container.orders,
   container.gateway,
+  container.cache,
 );
 const controller = new PaymentController(service);
 
