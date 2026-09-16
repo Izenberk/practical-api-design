@@ -11,7 +11,7 @@ interface Entry {
 }
 
 export class InMemoryIdempotencyStore implements IdempotencyStore {
-  private readonly entires = new Map<string, Entry>();
+  private readonly entries = new Map<string, Entry>();
 
   constructor(private readonly ttlMs: number = DEFAULT_TTL_MS) {}
 
@@ -20,7 +20,7 @@ export class InMemoryIdempotencyStore implements IdempotencyStore {
 
     if (existing !== null) return existing;
 
-    this.entires.set(key, {
+    this.entries.set(key, {
       record: { state: 'in_progress', requestHash },
       expiresAt: Date.now() + this.ttlMs,
     });
@@ -33,10 +33,10 @@ export class InMemoryIdempotencyStore implements IdempotencyStore {
     statusCode: number,
     body: unknown,
   ): Promise<void> {
-    const entry = this.entires.get(key);
+    const entry = this.entries.get(key);
     if (entry === undefined) return;
 
-    this.entires.set(key, {
+    this.entries.set(key, {
       record: {
         state: 'completed',
         requestHash: entry.record.requestHash,
@@ -48,15 +48,15 @@ export class InMemoryIdempotencyStore implements IdempotencyStore {
   }
 
   async release(key: string): Promise<void> {
-    this.entires.delete(key);
+    this.entries.delete(key);
   }
 
   private read(key: string): IdempotencyRecord | null {
-    const entry = this.entires.get(key);
+    const entry = this.entries.get(key);
     if (entry === undefined) return null;
 
     if (entry.expiresAt <= Date.now()) {
-      this.entires.delete(key);
+      this.entries.delete(key);
       return null;
     }
 
@@ -64,6 +64,6 @@ export class InMemoryIdempotencyStore implements IdempotencyStore {
   }
 
   clear(): void {
-    this.entires.clear();
+    this.entries.clear();
   }
 }

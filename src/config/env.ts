@@ -56,8 +56,7 @@ NodeEnv => {
   if (raw === undefined || raw.trim() === '') return fallback;
   if (!isNodeEnv(raw)) {
     problems.push(
-      `${key} must be one of ${NODE_ENVS.join(' | ')},
-      received "${raw}"`,
+      `${key} must be one of ${NODE_ENVS.join(' | ')}, received "${raw}"`,
     );
     return fallback;
   }
@@ -110,8 +109,7 @@ const parsed: EnvConfig = {
 
 if (problems.length > 0) {
   throw new Error(
-    `Invalid environment configuration:\n -
-    ${problems.join('\n - ')}`,
+    `Invalid environment configuration:\n - ${problems.join('\n - ')}`,
   );
 }
 
