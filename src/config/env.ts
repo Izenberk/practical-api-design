@@ -2,13 +2,23 @@ import dotenv from 'dotenv';
 
 dotenv.config({ quiet: true });
 const NODE_ENVS = ['development', 'production', 'test'] as const;
+const LOG_LEVELS = [
+  'error',
+  'warn',
+  'info',
+  'http',
+  'verbose',
+  'debug',
+  'silly',
+] as const;
 type NodeEnv = (typeof NODE_ENVS)[number];
+type LogLevel = (typeof LOG_LEVELS)[number];
 
 export interface EnvConfig {
   readonly PORT: number;
   readonly NODE_ENV: NodeEnv;
   readonly JWT_SECRET: string;
-  readonly LOG_LEVEL: string;
+  readonly LOG_LEVEL: LogLevel;
   readonly JWT_EXPIRES_SECONDS: number;
   readonly ADMIN_EMAIL: string | null;
   readonly ADMIN_PASSWORD: string | null;
@@ -54,6 +64,22 @@ NodeEnv => {
   return raw;
 };
 
+const isLogLevel = (value: string): value is LogLevel =>
+(LOG_LEVELS as readonly string[]).includes(value);
+
+const optionalLogLevel = (key: string, fallback: LogLevel):
+LogLevel => {
+  const raw = process.env[key];
+  if (raw === undefined || raw.trim() === '') return fallback;
+  if (!isLogLevel(raw)) {
+    problems.push(
+      `${key} must be one of ${LOG_LEVELS.join(' | ')}, received "${raw}"`,
+    );
+    return fallback;
+  }
+  return raw;
+};
+
 const optionalSeconds = (key: string, fallback: number): number => {
   const raw = process.env[key];
   if (raw === undefined || raw.trim() === '') return fallback;
@@ -76,7 +102,7 @@ const parsed: EnvConfig = {
   PORT: optionalPort('PORT', 3000),
   NODE_ENV: optionalNodeEnv('NODE_ENV', 'development'),
   JWT_SECRET: requireString('JWT_SECRET'),
-  LOG_LEVEL: process.env.LOG_LEVEL ?? 'info',
+  LOG_LEVEL: optionalLogLevel('LOG_LEVEL', 'http'),
   JWT_EXPIRES_SECONDS: optionalSeconds('JWT_EXPIRES_SECONDS', 900),
   ADMIN_EMAIL: optionalString('ADMIN_EMAIL'),
   ADMIN_PASSWORD: optionalString('ADMIN_PASSWORD'),
