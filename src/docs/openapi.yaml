@@ -212,8 +212,10 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
-    MissingIdempotencyKey:
-      description: Missing or empty Idempotency-Key header
+    BadRequest:
+      description: |
+        The request could not be accepted: a body that is not valid JSON, or a
+        missing `Idempotency-Key` header on a route that requires one.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -237,6 +239,7 @@ paths:
                 type: object
                 properties:
                   data: { $ref: '#/components/schemas/AuthResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/ValidationFailed' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
@@ -259,6 +262,7 @@ paths:
                 type: object
                 properties:
                   data: { $ref: '#/components/schemas/AuthResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '422': { $ref: '#/components/responses/ValidationFailed' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
@@ -304,6 +308,7 @@ paths:
                 type: object
                 properties:
                   data: { $ref: '#/components/schemas/Product' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '422': { $ref: '#/components/responses/ValidationFailed' }
@@ -345,6 +350,7 @@ paths:
                 type: object
                 properties:
                   data: { $ref: '#/components/schemas/Product' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -456,6 +462,7 @@ paths:
                 type: object
                 properties:
                   data: { $ref: '#/components/schemas/User' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -524,7 +531,7 @@ paths:
                 type: object
                 properties:
                   data: { $ref: '#/components/schemas/Order' }
-        '400': { $ref: '#/components/responses/MissingIdempotencyKey' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '409':
           description: Same key reused with a different body, or already in flight
@@ -598,6 +605,7 @@ paths:
                 type: object
                 properties:
                   data: { $ref: '#/components/schemas/Order' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -665,7 +673,7 @@ paths:
                 type: object
                 properties:
                   data: { $ref: '#/components/schemas/Payment' }
-        '400': { $ref: '#/components/responses/MissingIdempotencyKey' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
