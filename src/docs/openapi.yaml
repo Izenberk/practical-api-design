@@ -80,7 +80,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
-        description: { type: string, nullable: true }
+        description: { type: [string, 'null'] }
         priceSatang:
           type: integer
           description: Price in satang. 28900 means ฿289.00.
@@ -95,7 +95,7 @@ components:
       required: [name, priceSatang]
       properties:
         name: { type: string, minLength: 1, maxLength: 200 }
-        description: { type: string, nullable: true, maxLength: 2000 }
+        description: { type: [string, 'null'], maxLength: 2000 }
         priceSatang: { type: integer, minimum: 0 }
         currency: { type: string, minLength: 3, maxLength: 3, default: THB }
         stock: { type: integer, minimum: 0, default: 0 }
@@ -205,6 +205,18 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
+    TooManyRequests:
+      description: |
+        Rate limit exceeded. Applies to every route except `/health`; the
+        `RateLimit-*` response headers carry the current window.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    MissingIdempotencyKey:
+      description: Missing or empty Idempotency-Key header
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
 
 paths:
   /auth/register:
@@ -227,6 +239,7 @@ paths:
                   data: { $ref: '#/components/schemas/AuthResult' }
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /auth/login:
     post:
@@ -247,6 +260,8 @@ paths:
                 properties:
                   data: { $ref: '#/components/schemas/AuthResult' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /products:
     get:
@@ -266,6 +281,8 @@ paths:
                   data:
                     type: array
                     items: { $ref: '#/components/schemas/Product' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
     post:
       tags: [Products]
       summary: Create a product
@@ -290,6 +307,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /products/{id}:
     parameters:
@@ -307,6 +325,8 @@ paths:
                 properties:
                   data: { $ref: '#/components/schemas/Product' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
     put:
       tags: [Products]
       summary: Update a product
@@ -325,16 +345,22 @@ paths:
                 type: object
                 properties:
                   data: { $ref: '#/components/schemas/Product' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
     delete:
       tags: [Products]
       summary: Delete a product
       security: [{ bearerAuth: [] }]
       responses:
         '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /users:
     get:
@@ -355,7 +381,10 @@ paths:
                   data:
                     type: array
                     items: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /users/me:
     get:
@@ -376,6 +405,7 @@ paths:
                 properties:
                   data: { $ref: '#/components/schemas/User' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /users/{id}:
     parameters:
@@ -384,9 +414,10 @@ paths:
       tags: [Users]
       summary: Get one user
       description: |
-        A non-admin may only read their own record. Any other id returns 404,
-        including ids that do not exist, so the endpoint cannot be used to
-        discover which accounts are registered.
+        A non-admin may only read their own record; any other id returns 403.
+        Note this differs from orders, where a foreign id returns 404 so as not
+        to confirm the resource exists. Here the check runs before the lookup,
+        so 403 means "not yours", not "exists".
       security: [{ bearerAuth: [] }]
       responses:
         '200':
@@ -397,7 +428,11 @@ paths:
                 type: object
                 properties:
                   data: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
     put:
       tags: [Users]
       summary: Update a user
@@ -421,15 +456,23 @@ paths:
                 type: object
                 properties:
                   data: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
     delete:
       tags: [Users]
       summary: Delete a user
       security: [{ bearerAuth: [] }]
       responses:
         '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /orders:
     get:
@@ -452,6 +495,8 @@ paths:
                     type: array
                     items: { $ref: '#/components/schemas/Order' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
     post:
       tags: [Orders]
       summary: Place an order
@@ -479,12 +524,15 @@ paths:
                 type: object
                 properties:
                   data: { $ref: '#/components/schemas/Order' }
+        '400': { $ref: '#/components/responses/MissingIdempotencyKey' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '409':
           description: Same key reused with a different body, or already in flight
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /orders/{id}:
     parameters:
@@ -502,14 +550,21 @@ paths:
                 type: object
                 properties:
                   data: { $ref: '#/components/schemas/Order' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
     delete:
       tags: [Orders]
       summary: Delete an order (admin only)
       security: [{ bearerAuth: [] }]
       responses:
         '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /orders/{id}/status:
     parameters:
@@ -543,8 +598,12 @@ paths:
                 type: object
                 properties:
                   data: { $ref: '#/components/schemas/Order' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /payments:
     get:
@@ -565,6 +624,9 @@ paths:
                   data:
                     type: array
                     items: { $ref: '#/components/schemas/Payment' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
     post:
       tags: [Payments]
       summary: Pay for an order
@@ -603,13 +665,12 @@ paths:
                 type: object
                 properties:
                   data: { $ref: '#/components/schemas/Payment' }
-        '400':
-          description: Missing or empty Idempotency-Key header
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Error' }
+        '400': { $ref: '#/components/responses/MissingIdempotencyKey' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /payments/{id}:
     parameters:
@@ -627,4 +688,7 @@ paths:
                 type: object
                 properties:
                   data: { $ref: '#/components/schemas/Payment' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
